@@ -238,7 +238,8 @@ $("send").addEventListener("click", () => {
     return;
   }
 
-  if (!tg || !tg.initData) {
+  // В кнопке-клавиатуре initData пустой, поэтому проверяем платформу, а не initData
+  if (!tg || tg.platform === "unknown" || typeof tg.sendData !== "function") {
     alert("Откройте это приложение через кнопку в Telegram-боте, иначе заказ не уйдёт.");
     return;
   }
