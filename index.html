@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Заказ хинкали</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F1EDEF; --surface:#FFFFFF; --ink:#2A1620; --muted:#7A6670;
+  --accent:#8E1B3A; --accent-ink:#FFFFFF; --line:#DDD3D8; --err:#B3261E; --ok:#3F6B2C;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#1B1116; --surface:#27191F; --ink:#F4E9ED; --muted:#A8949D;
+        --accent:#E0577A; --accent-ink:#1B1116; --line:#41303A; --err:#FF8A80; --ok:#9CC283;}
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:16px; line-height:1.4;
+  padding:20px 16px calc(120px + env(safe-area-inset-bottom,0px));
+}
+main{max-width:520px;margin:0 auto}
+h1{font-size:34px;line-height:1.05;font-weight:800;margin:4px 0 8px;letter-spacing:-.02em}
+.lead{color:var(--muted);margin:0 0 24px}
+fieldset{border:0;padding:0;margin:0 0 24px;min-width:0}
+legend{font-weight:600;font-size:18px;padding:0;margin-bottom:10px}
+label.f{display:block;margin-bottom:14px}
+label.f span{display:block;font-size:14px;color:var(--muted);margin-bottom:5px}
+input,textarea{
+  width:100%;font:inherit;color:var(--ink);background:var(--surface);
+  border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;
+}
+textarea{resize:vertical;min-height:72px}
+input:focus,textarea:focus,button:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.invalid{border-color:var(--err)!important}
+.msg{color:var(--err);font-size:14px;margin:8px 2px 0}
+
+.items{background:var(--surface);border:1.5px solid var(--line);border-radius:14px;overflow:hidden}
+.item{padding:14px}
+.item + .item{border-top:1px solid var(--line)}
+.item .top{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.item .name{font-weight:600;font-size:17px}
+.item.on .name{color:var(--accent)}
+.item .price{white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}
+.item details{margin:4px 0 10px;font-size:14px;color:var(--muted)}
+.item summary{cursor:pointer;width:max-content;color:var(--muted);text-decoration:underline dotted;text-underline-offset:3px}
+.item details p{margin:6px 0 0}
+.item .bottom{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}
+.item details + .bottom{margin-top:0}
+.item .sum{font-variant-numeric:tabular-nums;color:var(--muted)}
+.item.on .sum{color:var(--ink);font-weight:600}
+.stepper{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.stepper button{
+  width:40px;height:40px;border-radius:50%;border:1.5px solid var(--line);
+  background:transparent;color:var(--ink);font:inherit;font-size:22px;line-height:1;cursor:pointer;
+}
+.stepper button:active{background:var(--line)}
+.stepper .kg{min-width:62px;text-align:center;font-variant-numeric:tabular-nums;font-weight:600}
+.stepper .kg.zero{color:var(--muted);font-weight:400}
+
+.bar{
+  position:fixed;left:0;right:0;bottom:0;background:var(--surface);
+  border-top:1px solid var(--line);
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));
+}
+.bar-in{max-width:520px;margin:0 auto;display:flex;align-items:center;gap:14px}
+.total{font-size:13px;color:var(--muted);line-height:1.25;flex:1;min-width:0}
+.total b{display:block;font-size:20px;color:var(--ink)}
+.total .ship.free{color:var(--ok);font-weight:600}
+#send{
+  border:0;border-radius:12px;padding:15px 20px;font:inherit;font-weight:600;font-size:17px;
+  background:var(--accent);color:var(--accent-ink);cursor:pointer;flex-shrink:0;
+}
+#send:disabled{opacity:.5}
+</style>
+</head>
+<body>
+<main>
+  <h1>Хинкали на заказ</h1>
+  <p class="lead">Выберите начинки и вес, укажите адрес и день. Заказ сразу уйдёт хозяину, он свяжется с вами. При заказе от 2 кг доставка бесплатно.</p>
+
+  <form id="form" novalidate>
+    <fieldset>
+      <legend>О вас</legend>
+      <label class="f"><span>Ваше имя</span>
+        <input id="name" autocomplete="name" placeholder="Например, Анна"></label>
+      <label class="f"><span>Телефон или @username для связи</span>
+        <input id="contact" autocomplete="tel" placeholder="+7 900 123 45 67"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Состав заказа</legend>
+      <div class="items" id="items"></div>
+      <div class="msg" id="items-msg" role="alert"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Доставка</legend>
+      <label class="f"><span>Адрес доставки</span>
+        <textarea id="address" autocomplete="street-address" placeholder="Город, улица, дом, квартира, этаж"></textarea></label>
+      <label class="f"><span>Желаемый день</span>
+        <input id="date" type="date"></label>
+    </fieldset>
+  </form>
+</main>
+
+<div class="bar">
+  <div class="bar-in">
+    <div class="total">
+      <b id="total">0 ₽</b>
+      <span id="kgsum">0 кг</span> · <span class="ship" id="ship"></span>
+    </div>
+    <button id="send" type="button">Отправить заказ</button>
+  </div>
+</div>
+
+<script>
+// ====== НАСТРОЙКИ ======
+// id и цены должны совпадать с CATALOG в bot.py (бот пересчитывает сумму сам)
+const CATALOG = [
+  { id: "beef_pork", name: "Говядина/свинина", price: 700,
+    comp: "Говядина/свинина 2:1, кинза, специи восточные, соль, лук." },
+  { id: "cheese", name: "Сыр", price: 850,
+    comp: "Домашний сулугуни, хохланд сливочный." },
+  { id: "potato_mushroom", name: "Картошка и грибы (постные)", price: 600,
+    comp: "Картошка, грибы, лук, растительное масло, перец свежемолотый, соль." },
+  { id: "lamb", name: "Баранина", price: 850,
+    comp: "Баранина, лук, кинза, соль, перец, зира." },
+  { id: "shrimp_zander", name: "Тигровая креветка и судак", price: 1250,
+    comp: "Креветки тигровые, филе судака, сливки, специи." },
+  { id: "cherry", name: "Вишня", price: 725,
+    comp: "Шикарная сочная вишня из лучших садов Узбекистана, сахар и любовь, с которой были выбраны все до единой косточки, и, Вах!, какая лёгкая кислинка." }
+];
+const STEP = 0.5;             // шаг веса, кг
+const MAX  = 20;              // максимум на одну позицию, кг
+const FREE_DELIVERY_KG = 2;   // от какого веса доставка бесплатна
+// =======================
+
+const tg = window.Telegram && Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+const $ = id => document.getElementById(id);
+const qty = Object.fromEntries(CATALOG.map(c => [c.id, 0]));
+const fmt = n => (Math.round(n * 10) / 10).toString().replace(".", ",");
+const rub = n => Math.round(n).toLocaleString("ru-RU") + " ₽";
+
+// Предзаполнение из профиля Telegram
+const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+if (u) {
+  $("name").value = [u.first_name, u.last_name].filter(Boolean).join(" ");
+  if (u.username) $("contact").value = "@" + u.username;
+}
+
+// Дата: не раньше сегодняшней
+const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+$("date").min = iso(new Date());
+
+// Список вкусов
+function renderItems() {
+  // раскрытые «Состав» запоминаем, чтобы они не схлопывались при нажатии +/−
+  const open = new Set([...document.querySelectorAll("#items details[open]")].map(d => d.dataset.id));
+  $("items").innerHTML = "";
+  CATALOG.forEach(c => {
+    const q = qty[c.id];
+    const row = document.createElement("div");
+    row.className = "item" + (q > 0 ? " on" : "");
+    row.innerHTML = `
+      <div class="top">
+        <div class="name">${c.name}</div>
+        <div class="price">${rub(c.price)}/кг</div>
+      </div>
+      <details data-id="${c.id}"${open.has(c.id) ? " open" : ""}><summary>Состав</summary><p>${c.comp}</p></details>
+      <div class="bottom">
+        <div class="stepper">
+          <button type="button" data-id="${c.id}" data-d="-1" aria-label="Меньше: ${c.name}">−</button>
+          <div class="kg ${q ? "" : "zero"}" aria-live="polite">${fmt(q)} кг</div>
+          <button type="button" data-id="${c.id}" data-d="1" aria-label="Больше: ${c.name}">+</button>
+        </div>
+        <div class="sum">${q ? rub(q * c.price) : ""}</div>
+      </div>`;
+    $("items").appendChild(row);
+  });
+
+  const kg = CATALOG.reduce((a, c) => a + qty[c.id], 0);
+  const sum = CATALOG.reduce((a, c) => a + qty[c.id] * c.price, 0);
+  $("kgsum").textContent = fmt(kg) + " кг";
+  $("total").textContent = rub(sum);
+  const ship = $("ship");
+  if (kg >= FREE_DELIVERY_KG) {
+    ship.textContent = "доставка бесплатно";
+    ship.className = "ship free";
+  } else {
+    ship.textContent = `до бесплатной доставки ${fmt(FREE_DELIVERY_KG - kg)} кг`;
+    ship.className = "ship";
+  }
+}
+$("items").addEventListener("click", e => {
+  const b = e.target.closest("button[data-id]");
+  if (!b) return;
+  const id = b.dataset.id;
+  qty[id] = Math.min(MAX, Math.max(0, qty[id] + STEP * +b.dataset.d));
+  $("items-msg").textContent = "";
+  renderItems();
+  if (tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+});
+renderItems();
+
+// Валидация и отправка
+function mark(el, bad) { el.classList.toggle("invalid", bad); return bad; }
+
+$("send").addEventListener("click", () => {
+  const name = $("name").value.trim();
+  const contact = $("contact").value.trim();
+  const address = $("address").value.trim();
+  const date = $("date").value;
+  const items = CATALOG.filter(c => qty[c.id] > 0).map(c => ({ id: c.id, kg: qty[c.id] }));
+
+  const contactOk = /^@[A-Za-z0-9_]{4,}$/.test(contact) || contact.replace(/\D/g, "").length >= 7;
+  const errors = [
+    mark($("name"), name.length < 2),
+    mark($("contact"), !contactOk),
+    mark($("address"), address.length < 5),
+    mark($("date"), !date || date < $("date").min)
+  ];
+  const noItems = items.length === 0;
+  $("items-msg").textContent = noItems ? "Добавьте хотя бы один вкус." : "";
+
+  if (errors.some(Boolean) || noItems) {
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("error");
+    const target = document.querySelector(".invalid") || $("items");
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
+  if (!tg || !tg.initData) {
+    alert("Откройте это приложение через кнопку в Telegram-боте, иначе заказ не уйдёт.");
+    return;
+  }
+  $("send").disabled = true;
+  tg.sendData(JSON.stringify({ name, contact, items, address, date }));   // приложение закроется само
+});
+
+["name", "contact", "address", "date"].forEach(id =>
+  $(id).addEventListener("input", () => $(id).classList.remove("invalid")));
+</script>
+</body>
+</html>
