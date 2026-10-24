@@ -78,6 +78,12 @@ input:focus,textarea:focus,button:focus-visible,summary:focus-visible{outline:3p
   background:var(--accent);color:var(--accent-ink);cursor:pointer;flex-shrink:0;
 }
 #send:disabled{opacity:.5}
+[hidden]{display:none!important}
+.done{position:fixed;inset:0;z-index:10;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:6px}
+.done h2{font-size:30px;margin:0 0 6px;letter-spacing:-.02em}
+.done p{color:var(--muted);margin:0 0 20px}
+.done b{color:var(--ink)}
+.done button{border:0;border-radius:12px;padding:15px 28px;font:inherit;font-weight:600;font-size:17px;background:var(--accent);color:var(--accent-ink);cursor:pointer}
 </style>
 </head>
 <body>
@@ -110,6 +116,12 @@ input:focus,textarea:focus,button:focus-visible,summary:focus-visible{outline:3p
   </form>
 </main>
 
+<div class="done" id="done" hidden>
+  <h2>Заказ отправлен</h2>
+  <p>Сумма заказа: <b id="done-sum"></b>.<br>Мы свяжемся с вами по указанному контакту.</p>
+  <button type="button" id="close">Закрыть</button>
+</div>
+
 <div class="bar">
   <div class="bar-in">
     <div class="total">
@@ -124,12 +136,16 @@ input:focus,textarea:focus,button:focus-visible,summary:focus-visible{outline:3p
 // ====== НАСТРОЙКИ ======
 // id и цены должны совпадать с CATALOG в bot.py (бот пересчитывает сумму сам)
 const CATALOG = [
-  { id: "beef_pork", name: "Говядина/свинина", price: 700,
+  { id: "beef_pork", name: "Говядина/свинина", price: 720,
     comp: "Говядина/свинина 2:1, кинза, специи восточные, соль, лук." },
+  { id: "chicken", name: "Курица", price: 720,
+    comp: "Курица, кинза, специи восточные, соль, лук." },
   { id: "cheese", name: "Сыр", price: 850,
     comp: "Домашний сулугуни, хохланд сливочный." },
   { id: "potato_mushroom", name: "Картошка и грибы (постные)", price: 600,
     comp: "Картошка, грибы, лук, растительное масло, перец свежемолотый, соль." },
+  { id: "potato_adjika", name: "Картошка с аджикой", price: 600,
+    comp: "Картошка, аджика, лук, растительное масло, перец свежемолотый, соль." },
   { id: "lamb", name: "Баранина", price: 850,
     comp: "Баранина, лук, кинза, соль, перец, зира." },
   { id: "shrimp_zander", name: "Тигровая креветка и судак", price: 1250,
@@ -140,6 +156,7 @@ const CATALOG = [
 const STEP = 0.5;             // шаг веса, кг
 const MAX  = 20;              // максимум на одну позицию, кг
 const FREE_DELIVERY_KG = 2;   // от какого веса доставка бесплатна
+const WORKER_URL = "https://ВАШ-АДРЕС.workers.dev";   // адрес вашего Worker из Cloudflare (без / в конце)
 // =======================
 
 const tg = window.Telegram && Telegram.WebApp;
@@ -214,7 +231,7 @@ renderItems();
 // Валидация и отправка
 function mark(el, bad) { el.classList.toggle("invalid", bad); return bad; }
 
-$("send").addEventListener("click", () => {
+$("send").addEventListener("click", async () => {
   const name = $("name").value.trim();
   const contact = $("contact").value.trim();
   const address = $("address").value.trim();
@@ -238,14 +255,42 @@ $("send").addEventListener("click", () => {
     return;
   }
 
-  // В кнопке-клавиатуре initData пустой, поэтому проверяем платформу, а не initData
-  if (!tg || tg.platform === "unknown" || typeof tg.sendData !== "function") {
-    alert("Откройте это приложение через кнопку в Telegram-боте, иначе заказ не уйдёт.");
+  if (!tg || !tg.initData) {
+    const m = "Откройте форму кнопкой «Сделать заказ» из сообщения бота (отправьте боту /start).";
+    if (tg && tg.showAlert) tg.showAlert(m); else alert(m);
     return;
   }
-  $("send").disabled = true;
-  tg.sendData(JSON.stringify({ name, contact, items, address, date }));   // приложение закроется само
+  if (WORKER_URL.includes("ВАШ-АДРЕС")) { alert("В index.html не указан адрес Worker (WORKER_URL)."); return; }
+
+  const btn = $("send");
+  btn.disabled = true;
+  btn.textContent = "Отправляем…";
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20000);
+  try {
+    const res = await fetch(WORKER_URL + "/order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData: tg.initData, order: { name, contact, items, address, date } }),
+      signal: ctrl.signal
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error(data.error || "Не удалось отправить заказ. Попробуйте ещё раз.");
+    $("done-sum").textContent = rub(data.total);
+    $("done").hidden = false;
+    if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+  } catch (err) {
+    const m = err.name === "AbortError" || err instanceof TypeError
+      ? "Нет связи с сервером. Проверьте интернет и попробуйте ещё раз."
+      : err.message;
+    if (tg.showAlert) tg.showAlert(m); else alert(m);
+    btn.disabled = false;
+    btn.textContent = "Отправить заказ";
+  } finally {
+    clearTimeout(timer);
+  }
 });
+$("close").addEventListener("click", () => { if (tg) tg.close(); });
 
 ["name", "contact", "address", "date"].forEach(id =>
   $(id).addEventListener("input", () => $(id).classList.remove("invalid")));
