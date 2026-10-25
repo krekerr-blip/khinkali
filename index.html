@@ -89,7 +89,7 @@ input:focus,textarea:focus,button:focus-visible,summary:focus-visible{outline:3p
 <body>
 <main>
   <h1>Хинкали на заказ</h1>
-  <p class="lead">Выберите начинки и вес, укажите адрес и день. Заказ сразу уйдёт хозяину, он свяжется с вами. При заказе от 2 кг доставка бесплатно.</p>
+  <p class="lead">Выберите начинки и вес, укажите адрес и день. После получения заявки мы с вами свяжемся для подтверждения заказа. При заказе от 2 кг доставка бесплатно.</p>
 
   <form id="form" novalidate>
     <fieldset>
@@ -153,7 +153,7 @@ const CATALOG = [
   { id: "cherry", name: "Вишня", price: 725,
     comp: "Шикарная сочная вишня из лучших садов Узбекистана, сахар и любовь, с которой были выбраны все до единой косточки, и, Вах!, какая лёгкая кислинка." }
 ];
-const STEP = 0.5;             // шаг веса, кг
+const STEP = 1;             // шаг веса, кг
 const MAX  = 20;              // максимум на одну позицию, кг
 const FREE_DELIVERY_KG = 2;   // от какого веса доставка бесплатна
    const WORKER_URL = "https://khinkali-orderr.logunkova-alena.workers.dev";
