@@ -42,6 +42,29 @@ input:focus,textarea:focus,button:focus-visible,summary:focus-visible{outline:3p
 .msg{color:var(--err);font-size:14px;margin:8px 2px 0}
 
 .items{background:var(--surface);border:1.5px solid var(--line);border-radius:14px;overflow:hidden}
+  .menu-switch{
+  display:flex;
+  gap:10px;
+  margin-bottom:14px;
+}
+
+.menu-btn{
+  flex:1;
+  border:1.5px solid var(--line);
+  border-radius:12px;
+  padding:12px 10px;
+  background:var(--surface);
+  color:var(--ink);
+  font:inherit;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.menu-btn.active{
+  background:var(--accent);
+  color:var(--accent-ink);
+  border-color:var(--accent);
+}
 .item{padding:14px}
 .item + .item{border-top:1px solid var(--line)}
 .item .top{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
@@ -100,11 +123,17 @@ input:focus,textarea:focus,button:focus-visible,summary:focus-visible{outline:3p
         <input id="contact" autocomplete="tel" placeholder="+7 900 123 45 67"></label>
     </fieldset>
 
-    <fieldset>
-      <legend>Состав заказа</legend>
-      <div class="items" id="items"></div>
-      <div class="msg" id="items-msg" role="alert"></div>
-    </fieldset>
+<fieldset>
+  <legend>Состав заказа</legend>
+
+  <div class="menu-switch">
+    <button type="button" class="menu-btn active" data-menu="khinkali">🥟 Хинкали</button>
+    <button type="button" class="menu-btn" data-menu="chebureki">🥟 Чебуреки</button>
+  </div>
+
+  <div class="items" id="items"></div>
+  <div class="msg" id="items-msg" role="alert"></div>
+</fieldset>
 
     <fieldset>
       <legend>Доставка</legend>
@@ -151,7 +180,9 @@ const CATALOG = [
   { id: "shrimp_zander", name: "Тигровая креветка и судак", price: 1250,
     comp: "Креветки тигровые, филе судака, сливки, специи." },
   { id: "cherry", name: "Вишня", price: 725,
-    comp: "Вишня, сахар." }
+    comp: "Вишня, сахар." },
+  { id: "chicken_cheese_cheburek", name: "Курица с сыром", price: 750,
+    comp: "Курица, сыр сулугуни, соль, перец, хмели-сунели." }
 ];
 const STEP = 1;             // шаг веса, кг
 const MAX  = 20;              // максимум на одну позицию, кг
@@ -164,6 +195,7 @@ if (tg) { tg.ready(); tg.expand(); }
 
 const $ = id => document.getElementById(id);
 const qty = Object.fromEntries(CATALOG.map(c => [c.id, 0]));
+  let activeMenu = "khinkali";
 const fmt = n => (Math.round(n * 10) / 10).toString().replace(".", ",");
 const rub = n => Math.round(n).toLocaleString("ru-RU") + " ₽";
 
@@ -183,7 +215,12 @@ function renderItems() {
   // раскрытые «Состав» запоминаем, чтобы они не схлопывались при нажатии +/−
   const open = new Set([...document.querySelectorAll("#items details[open]")].map(d => d.dataset.id));
   $("items").innerHTML = "";
-  CATALOG.forEach(c => {
+
+  const visibleCatalog = activeMenu === "khinkali"
+    ? CATALOG.filter(c => c.id !== "chicken_cheese_cheburek")
+    : CATALOG.filter(c => c.id === "chicken_cheese_cheburek");
+
+  visibleCatalog.forEach(c => {
     const q = qty[c.id];
     const row = document.createElement("div");
     row.className = "item" + (q > 0 ? " on" : "");
@@ -225,6 +262,17 @@ $("items").addEventListener("click", e => {
   $("items-msg").textContent = "";
   renderItems();
   if (tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+});
+  document.querySelectorAll(".menu-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    activeMenu = btn.dataset.menu;
+
+    document.querySelectorAll(".menu-btn").forEach(b => {
+      b.classList.toggle("active", b === btn);
+    });
+
+    renderItems();
+  });
 });
 renderItems();
 
